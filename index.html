@@ -37,6 +37,7 @@
     .btn-logout { background: #b1471e; }
     .btn-secondary { background: white; color: #1e5a8a; border: 1.5px solid #cbdae6; }
     .btn-download { background: #0e6b3b; }
+    .btn-refresh { background: #5c7b96; font-size: 0.8rem; padding: 0.5rem 1rem; }
 
     .msg { margin-top: 0.9rem; font-size: 0.9rem; font-weight: 600; min-height: 1.2rem; }
     .msg.error { color: #b13a3a; }
@@ -115,6 +116,11 @@
       <div class="msg" id="message"></div>
     </div>
 
+    <!-- NEW MANUAL REFRESH BUTTON -->
+    <div style="text-align: right; margin-bottom: 0.5rem;">
+      <button class="btn btn-refresh" id="refreshBtn">🔄 Refresh Table</button>
+    </div>
+
     <div class="table-wrap">
       <div class="table-header">
         <div>#</div><div>Student Name</div><div>Shift</div><div>Grade</div><div>Section</div><div>Log-in</div><div>Log-out</div><div>Status</div>
@@ -149,7 +155,8 @@
     (function () {
       const ADMIN_PASSWORD = 'mnhs-admin';   // 🔑 Change this password!
       
-      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyEoWom1MmGjSFUGJZJv3RZR5WCju6Pf0hxxaxnQfxTw1imLYvdw2X-zrl2Y3ChFrOH1w/exec'; 
+      // YOUR LATEST SCRIPT URL
+      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyKPqkv69jqWOLQmT_ws6AmdFax17Imh_59-R-BD4jwmErmFMOpsLr1cPRFeGMeSCS-wA/exec'; 
 
       let records = [];
       let currentDate = new Date().toLocaleDateString('en-CA');
@@ -180,48 +187,37 @@
         if (text) { clearTimeout(setMessage._t); setMessage._t = setTimeout(() => { messageEl.textContent = ''; }, 4500); }
       }
 
-      // THE FIX IS HERE: Forcing all data to be text (strings) so they match perfectly
       async function fetchDataFromSheet() {
         if (!SCRIPT_URL) return;
         try {
           const res = await fetch(SCRIPT_URL + '?t=' + new Date().getTime());
           const data = await res.json();
           
-          // Rebuild records with forced string matching
-          records = data.filter(r => r.date === currentDate).map(r => {
-            const shift = String(r.shift || '').trim();
-            const last = String(r.lastName || '').trim().toUpperCase();
-            const first = String(r.firstName || '').trim().toUpperCase();
-            const mi = String(r.mi || '').trim().toUpperCase();
-            const grade = String(r.grade || '').trim().toUpperCase();
-            const section = String(r.section || '').trim().toUpperCase();
-            
-            return {
-              key: `${shift}|${last}|${first}|${mi}|${grade}|${section}`.toLowerCase(),
-              shift: shift,
-              lastName: last,
-              firstName: first,
-              middleInitial: mi,
-              gradeLevel: grade,
-              section: section,
-              fullName: `${last}, ${first} ${mi ? mi.charAt(0)+'.' : ''}`.trim(),
-              loginTime: r.action === 'Log In' ? r.timestamp : null,
-              logoutTime: r.action === 'Log Out' ? r.timestamp : null
-            };
-          });
-          
-          // Combine login and logout rows for the same student
           const grouped = {};
-          records.forEach(r => {
-            if (!grouped[r.key]) {
-              grouped[r.key] = { ...r };
-            } else {
-              if (r.loginTime) grouped[r.key].loginTime = r.loginTime;
-              if (r.logoutTime) grouped[r.key].logoutTime = r.logoutTime;
+          data.filter(r => r.date === currentDate).forEach(row => {
+            // Force ALL fields to clean strings so they match perfectly
+            const shift = String(row.shift || '').trim().toUpperCase();
+            const last = String(row.lastName || '').trim().toUpperCase();
+            const first = String(row.firstName || '').trim().toUpperCase();
+            const mi = String(row.mi || '').trim().toUpperCase();
+            const grade = String(row.grade || '').trim().toUpperCase();
+            const section = String(row.section || '').trim().toUpperCase();
+            
+            const key = `${shift}|${last}|${first}|${mi}|${grade}|${section}`.toLowerCase();
+
+            if (!grouped[key]) {
+              grouped[key] = { 
+                key: key, shift: shift, lastName: last, firstName: first, middleInitial: mi,
+                gradeLevel: grade, section: section, 
+                fullName: `${last}, ${first} ${mi ? mi.charAt(0)+'.' : ''}`.trim(), 
+                loginTime: null, logoutTime: null 
+              };
             }
+            if (row.action === 'Log In') grouped[key].loginTime = row.timestamp;
+            if (row.action === 'Log Out') grouped[key].logoutTime = row.timestamp;
           });
-          records = Object.values(grouped);
           
+          records = Object.values(grouped);
           render();
         } catch (e) { console.error("Sync error:", e); }
       }
@@ -237,7 +233,7 @@
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
           });
           
-          setTimeout(fetchDataFromSheet, 800); 
+          setTimeout(fetchDataFromSheet, 1000); 
         } catch (e) { 
           setMessage('❌ Failed to save. Check internet connection.', 'error'); 
         }
@@ -286,20 +282,16 @@
         setMessage('Saving...', 'info'); 
         sendToSheet(payload);
         
-        // Add to local list immediately so they can't double click
         records.push({ key, shift: n.shift, lastName: n.last, firstName: n.first, middleInitial: n.mi, gradeLevel: n.grade, section: n.section, fullName: n.fullName, date: currentDate, loginTime: payload.time, logoutTime: null });
-        clearInputs(); 
-        render(); 
-        setMessage(`✅ ${n.fullName} logged in!`, 'success');
+        clearInputs(); render(); setMessage(`✅ ${n.fullName} logged in!`, 'success');
       }
 
       function handleLogout() {
         const n = readFormFields(); if (!n) return;
         const key = `${n.shift}|${n.last}|${n.first}|${n.mi}|${n.grade}|${n.section}`.toLowerCase();
         
-        // Look in our strict local memory
         const rec = records.find(r => r.key === key);
-        if (!rec) return setMessage('No record found. Make sure ALL details match your log-in.', 'error');
+        if (!rec) return setMessage('No record found. Make sure ALL details match your log-in exactly.', 'error');
         if (rec.logoutTime) return setMessage('Already logged out.', 'error');
 
         const payload = { date: currentDate, action: 'Log Out', shift: n.shift, lastName: n.last, firstName: n.first, mi: n.mi, grade: n.grade, section: n.section, time: new Date().toISOString() };
@@ -366,7 +358,15 @@
       loginBtn.addEventListener('click', handleLogin); logoutBtn.addEventListener('click', handleLogout);
       clearBtn.addEventListener('click', clearInputs); $('downloadBtn').addEventListener('click', openAdminModal);
       cancelModalBtn.addEventListener('click', () => adminModal.classList.remove('show'));
-      confirmDownloadBtn.addEventListener('click', confirmDownload); init();
+      confirmDownloadBtn.addEventListener('click', confirmDownload); 
+
+      // ADDED MANUAL REFRESH BUTTON
+      $('refreshBtn').addEventListener('click', function() {
+        setMessage('Refreshing data from Google Sheets...', 'info');
+        fetchDataFromSheet();
+      });
+
+      init();
     })();
   </script>
 </body>
