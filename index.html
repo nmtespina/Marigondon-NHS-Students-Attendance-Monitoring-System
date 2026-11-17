@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MNHS Daily Attendance Tracker</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background-color: #eef3f9; font-family: 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 1.5rem; color: #0b2b4a; position: relative; overflow-x: hidden; }
+    .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 85vw; max-width: 750px; opacity: 0.06; z-index: 0; pointer-events: none; }
+    .app-card { background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(10px); max-width: 1200px; width: 100%; border-radius: 28px; box-shadow: 0 20px 50px -15px rgba(0, 30, 60, 0.25); padding: 2rem; position: relative; z-index: 1; }
+    
+    .school-header { text-align: center; border-bottom: 3px solid #1e5a8a; padding-bottom: 1.25rem; margin-bottom: 1.5rem; }
+    .school-header h1 { font-size: 1.8rem; font-weight: 700; color: #0b2b4a; text-transform: uppercase; }
+    .school-header h2 { font-size: 1.1rem; font-weight: 800; color: #8b0000; margin-top: 6px; text-transform: uppercase; }
+    .live-date { display: inline-flex; align-items: center; gap: 10px; background: #eaf1f8; border: 1.5px solid #c8d9e9; padding: 0.55rem 1.3rem; border-radius: 40px; font-size: 0.95rem; font-weight: 700; margin-top: 0.85rem; }
+    .live-date .dot { width: 10px; height: 10px; border-radius: 50%; background: #0e6b3b; animation: pulse 1.8s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+    .time-banner { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-bottom: 1.5rem; }
+    .time-chip { background: #fff; border: 1px solid #cbdae6; padding: 0.6rem 1.2rem; border-radius: 40px; font-size: 0.85rem; font-weight: 600; color: #2e4e6c; }
+
+    .instruction-box { background: #e8f4fc; border-left: 5px solid #1e5a8a; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; font-size: 0.9rem; color: #13446b; }
+    .instruction-box ul { margin-left: 1.5rem; line-height: 1.6; }
+
+    .form-card { background: #f7fafd; border-radius: 20px; padding: 1.5rem; margin-bottom: 1.75rem; border: 1px solid #e2eaf1; }
+    .form-row { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; }
+    .input-group { flex: 1 1 120px; display: flex; flex-direction: column; gap: 5px; }
+    .input-group label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #3b5e7b; }
+    .input-group input, .input-group select { padding: 0.8rem 1rem; border: 1.5px solid #d7e0e8; border-radius: 12px; font-size: 0.95rem; background: white; outline: none; font-family: inherit; width: 100%; text-transform: uppercase; }
+    .input-group select { cursor: pointer; }
+    .input-group input:focus, .input-group select:focus { border-color: #1e5a8a; box-shadow: 0 0 0 4px rgba(30, 90, 138, 0.12); }
+
+    .btn { border: none; background: #1e5a8a; color: white; font-weight: 600; padding: 0.8rem 1.5rem; border-radius: 12px; font-size: 0.95rem; cursor: pointer; transition: 0.15s; font-family: inherit; }
+    .btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
+    .btn-login { background: #0e6b3b; }
+    .btn-logout { background: #b1471e; }
+    .btn-secondary { background: white; color: #1e5a8a; border: 1.5px solid #cbdae6; }
+    .btn-download { background: #0e6b3b; }
+
+    .msg { margin-top: 0.9rem; font-size: 0.9rem; font-weight: 600; min-height: 1.2rem; }
+    .msg.error { color: #b13a3a; }
+    .msg.success { color: #0e6b3b; }
+
+    .table-wrap { border: 1px solid #e2eaf1; border-radius: 20px; overflow: hidden; margin-bottom: 1.25rem; background: white; }
+    .table-header, .student-row { display: grid; grid-template-columns: 40px 1.8fr 90px 1fr 1fr 80px 80px 90px; align-items: center; }
+    .table-header { background: #f1f6fb; padding: 0.85rem 1rem; font-weight: 700; font-size: 0.75rem; text-transform: uppercase; color: #2e4e6c; border-bottom: 1px solid #d9e2ec; }
+    .student-row { padding: 0.8rem 1rem; border-bottom: 1px solid #edf2f7; font-size: 0.85rem; }
+    .student-row:hover { background: #f9fcff; }
+    .student-name { font-weight: 600; color: #0d2f4b; display: flex; align-items: center; gap: 8px; }
+    .avatar { width: 28px; height: 28px; background: #1e5a8a; color: white; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.75rem; }
+    .badge { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 20px; }
+    .badge.present { background: #dff0e2; color: #0e6b3b; }
+    .badge.out { background: #fef0e2; color: #b1651e; }
+    .shift-badge { font-size: 0.7rem; font-weight: 700; color: #5c7b96; background: #eaf1f8; padding: 0.2rem 0.5rem; border-radius: 6px; }
+    .shift-Morning { color: #b1651e; background: #fff3e0; }
+    .shift-Afternoon { color: #1e5a8a; background: #e3f2fd; }
+    .shift-Regular { color: #0e6b3b; background: #e8f5e9; }
+
+    .actions { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; align-items: center; }
+    .stats { display: flex; gap: 1.5rem; font-size: 0.9rem; background: #eaf1f8; padding: 0.7rem 1.4rem; border-radius: 40px; }
+    
+    .modal-overlay { position: fixed; inset: 0; background: rgba(11, 43, 74, 0.55); display: none; align-items: center; justify-content: center; z-index: 999; }
+    .modal-overlay.show { display: flex; }
+    .modal { background: white; border-radius: 20px; padding: 2rem; max-width: 420px; width: 100%; }
+    .modal input { width: 100%; padding: 0.8rem 1rem; border: 1.5px solid #d7e0e8; border-radius: 12px; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <img class="watermark" src="https://i.ibb.co/6PZ8Z6B/mnhs-logo.png" alt="Logo">
+  <div class="app-card">
+    <div class="school-header">
+      <h1>Marigondon National High School</h1>
+      <h2>Daily Attendance Tracker</h2>
+      <div class="live-date"><span class="dot"></span><span id="liveDateText">Loading...</span></div>
+    </div>
+
+    <div class="time-banner">
+      <div class="time-chip">🌅 <strong>Morning:</strong> 6-7AM / 12-1PM</div>
+      <div class="time-chip">🌇 <strong>Afternoon:</strong> 12-1PM / 5-6PM</div>
+      <div class="time-chip">☀️ <strong>Regular:</strong> 6-8AM / 5-6PM</div>
+      <div class="time-chip">🕒 <span id="currentTimeText">--:--</span></div>
+    </div>
+
+    <div class="instruction-box">
+      <ul>
+        <li><strong>Fill out in CAPITAL LETTERS.</strong></li>
+        <li><strong>Must encode the exact same data for Log-Out.</strong></li>
+        <li><strong>Section:</strong> Just write the <strong>LAST NAME of the adviser</strong>.</li>
+      </ul>
+    </div>
+
+    <div class="form-card">
+      <div class="form-row">
+        <div class="input-group" style="flex: 1 1 160px;">
+          <label>Select Shift</label>
+          <select id="shift">
+            <option value="" disabled selected>-- Choose Shift --</option>
+            <option value="Morning">Morning Shift</option>
+            <option value="Afternoon">Afternoon Shift</option>
+            <option value="Regular">Regular Shift</option>
+          </select>
+        </div>
+        <div class="input-group" style="flex: 2 1 130px;"><label>Last Name</label><input type="text" id="lastName" placeholder="DELA CRUZ"></div>
+        <div class="input-group" style="flex: 2 1 130px;"><label>First Name</label><input type="text" id="firstName" placeholder="JUAN"></div>
+        <div class="input-group" style="flex: 0 1 70px;"><label>M.I.</label><input type="text" id="middleInitial" maxlength="2"></div>
+        <div class="input-group" style="flex: 0 1 80px;"><label>Grade Lvl</label><input type="text" id="gradeLevel" placeholder="7" maxlength="2"></div>
+        <div class="input-group" style="flex: 1 1 120px;"><label>Section (Adviser)</label><input type="text" id="section" placeholder="DELA CRUZ"></div>
+        <div style="display:flex; gap:10px; margin-left:auto;">
+          <button class="btn btn-login" id="loginBtn">✅ Log In</button>
+          <button class="btn btn-logout" id="logoutBtn">🚪 Log Out</button>
+          <button class="btn btn-secondary" id="clearBtn">Clear</button>
+        </div>
+      </div>
+      <div class="msg" id="message"></div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-header">
+        <div>#</div><div>Student Name</div><div>Shift</div><div>Grade</div><div>Section</div><div>Log-in</div><div>Log-out</div><div>Status</div>
+      </div>
+      <div id="attendanceListContainer"></div>
+    </div>
+
+    <div class="actions">
+      <div class="stats">
+        <div>✅ Present: <b id="presentCount">0</b></div>
+        <div>🚪 Logged Out: <b id="outCount">0</b></div>
+        <div>👥 Total: <b id="totalCount">0</b></div>
+      </div>
+      <button class="btn btn-download" id="downloadBtn">⬇ Download Excel (Admin)</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="adminModal">
+    <div class="modal">
+      <h3>🔒 Admin Access</h3>
+      <input type="date" id="downloadDateInput">
+      <input type="password" id="adminPassword" placeholder="Password">
+      <div class="msg error" id="modalMsg"></div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button class="btn btn-secondary" id="cancelModalBtn">Cancel</button>
+        <button class="btn btn-download" id="confirmDownloadBtn">Download</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const ADMIN_PASSWORD = 'mnhs-admin';   // 🔑 Change this password!
+      
+      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyEoWom1MmGjSFUGJZJv3RZR5WCju6Pf0hxxaxnQfxTw1imLYvdw2X-zrl2Y3ChFrOH1w/exec'; 
+
+      let records = [];
+      let currentDate = new Date().toLocaleDateString('en-CA');
+
+      const $ = (id) => document.getElementById(id);
+      const shiftInput = $('shift'), lastNameInput = $('lastName'), firstNameInput = $('firstName');
+      const middleInitialInput = $('middleInitial'), gradeLevelInput = $('gradeLevel'), sectionInput = $('section');
+      const loginBtn = $('loginBtn'), logoutBtn = $('logoutBtn'), clearBtn = $('clearBtn');
+      const messageEl = $('message'), listContainer = $('attendanceListContainer');
+      const presentCountEl = $('presentCount'), outCountEl = $('outCount'), totalCountEl = $('totalCount');
+      
+      const adminModal = $('adminModal'), adminPasswordInput = $('adminPassword');
+      const downloadDateInput = $('downloadDateInput'), modalMsg = $('modalMsg');
+      const confirmDownloadBtn = $('confirmDownloadBtn'), cancelModalBtn = $('cancelModalBtn');
+
+      function todayStr() { return new Date().toLocaleDateString('en-CA'); }
+      function prettyDateFromString(dateStr) {
+        if (!dateStr) return '';
+        const [y, m, d] = dateStr.split('-');
+        return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      }
+      function formatTime(iso) { if (!iso) return '—'; return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }); }
+      function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+      
+      function setMessage(text, type = 'info') {
+        messageEl.textContent = text;
+        messageEl.className = 'msg ' + type;
+        if (text) { clearTimeout(setMessage._t); setMessage._t = setTimeout(() => { messageEl.textContent = ''; }, 4500); }
+      }
+
+      // THE FIX IS HERE: Forcing all data to be text (strings) so they match perfectly
+      async function fetchDataFromSheet() {
+        if (!SCRIPT_URL) return;
+        try {
+          const res = await fetch(SCRIPT_URL + '?t=' + new Date().getTime());
+          const data = await res.json();
+          
+          // Rebuild records with forced string matching
+          records = data.filter(r => r.date === currentDate).map(r => {
+            const shift = String(r.shift || '').trim();
+            const last = String(r.lastName || '').trim().toUpperCase();
+            const first = String(r.firstName || '').trim().toUpperCase();
+            const mi = String(r.mi || '').trim().toUpperCase();
+            const grade = String(r.grade || '').trim().toUpperCase();
+            const section = String(r.section || '').trim().toUpperCase();
+            
+            return {
+              key: `${shift}|${last}|${first}|${mi}|${grade}|${section}`.toLowerCase(),
+              shift: shift,
+              lastName: last,
+              firstName: first,
+              middleInitial: mi,
+              gradeLevel: grade,
+              section: section,
+              fullName: `${last}, ${first} ${mi ? mi.charAt(0)+'.' : ''}`.trim(),
+              loginTime: r.action === 'Log In' ? r.timestamp : null,
+              logoutTime: r.action === 'Log Out' ? r.timestamp : null
+            };
+          });
+          
+          // Combine login and logout rows for the same student
+          const grouped = {};
+          records.forEach(r => {
+            if (!grouped[r.key]) {
+              grouped[r.key] = { ...r };
+            } else {
+              if (r.loginTime) grouped[r.key].loginTime = r.loginTime;
+              if (r.logoutTime) grouped[r.key].logoutTime = r.logoutTime;
+            }
+          });
+          records = Object.values(grouped);
+          
+          render();
+        } catch (e) { console.error("Sync error:", e); }
+      }
+
+      async function sendToSheet(payload) {
+        try {
+          const formData = new URLSearchParams();
+          for (const key in payload) formData.append(key, payload[key]);
+          
+          await fetch(SCRIPT_URL, { 
+            method: 'POST', 
+            body: formData,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+          });
+          
+          setTimeout(fetchDataFromSheet, 800); 
+        } catch (e) { 
+          setMessage('❌ Failed to save. Check internet connection.', 'error'); 
+        }
+      }
+
+      function render() {
+        const list = records.slice().sort((a, b) => new Date(a.loginTime || 0) - new Date(b.loginTime || 0));
+        if (list.length === 0) {
+          listContainer.innerHTML = `<div style="padding:2rem; text-align:center; color:#7a8f9f;">No students yet today.</div>`;
+        } else {
+          listContainer.innerHTML = list.map((r, i) => {
+            const shiftClass = r.shift ? `shift-${r.shift.split(' ')[0]}` : '';
+            return `
+              <div class="student-row">
+                <div>${i + 1}</div>
+                <div class="student-name"><span class="avatar">${escapeHtml((r.lastName||'?').charAt(0))}</span>${escapeHtml(r.fullName)}</div>
+                <div><span class="shift-badge ${shiftClass}">${escapeHtml(r.shift || 'N/A')}</span></div>
+                <div style="font-weight:bold; color:#1e5a8a;">${escapeHtml(r.gradeLevel)}</div>
+                <div>${escapeHtml(r.section)}</div>
+                <div style="font-size:0.8rem;">${formatTime(r.loginTime)}</div>
+                <div style="font-size:0.8rem;">${formatTime(r.logoutTime)}</div>
+                <div>${r.logoutTime ? '<span class="badge out">Out</span>' : '<span class="badge present">Present</span>'}</div>
+              </div>`;
+          }).join('');
+        }
+        presentCountEl.textContent = list.filter(r => !r.logoutTime).length;
+        outCountEl.textContent = list.filter(r => r.logoutTime).length;
+        totalCountEl.textContent = list.length;
+      }
+
+      function readFormFields() {
+        const shift = shiftInput.value.trim(), last = lastNameInput.value.trim().toUpperCase();
+        const first = firstNameInput.value.trim().toUpperCase(), mi = middleInitialInput.value.trim().toUpperCase();
+        const grade = gradeLevelInput.value.trim().toUpperCase(), section = sectionInput.value.trim().toUpperCase();
+        if (!shift || !last || !first || !grade || !section) { setMessage('Please fill all fields.', 'error'); return null; }
+        const miPart = mi ? ' ' + mi.replace(/[^A-Z]/g, '').charAt(0) + '.' : '';
+        return { shift, last, first, mi, grade, section, fullName: `${last}, ${first}${miPart}` };
+      }
+
+      function handleLogin() {
+        const n = readFormFields(); if (!n) return;
+        const key = `${n.shift}|${n.last}|${n.first}|${n.mi}|${n.grade}|${n.section}`.toLowerCase();
+        if (records.find(r => r.key === key)) return setMessage('Already logged in for this shift today.', 'error');
+
+        const payload = { date: currentDate, action: 'Log In', shift: n.shift, lastName: n.last, firstName: n.first, mi: n.mi, grade: n.grade, section: n.section, time: new Date().toISOString() };
+        setMessage('Saving...', 'info'); 
+        sendToSheet(payload);
+        
+        // Add to local list immediately so they can't double click
+        records.push({ key, shift: n.shift, lastName: n.last, firstName: n.first, middleInitial: n.mi, gradeLevel: n.grade, section: n.section, fullName: n.fullName, date: currentDate, loginTime: payload.time, logoutTime: null });
+        clearInputs(); 
+        render(); 
+        setMessage(`✅ ${n.fullName} logged in!`, 'success');
+      }
+
+      function handleLogout() {
+        const n = readFormFields(); if (!n) return;
+        const key = `${n.shift}|${n.last}|${n.first}|${n.mi}|${n.grade}|${n.section}`.toLowerCase();
+        
+        // Look in our strict local memory
+        const rec = records.find(r => r.key === key);
+        if (!rec) return setMessage('No record found. Make sure ALL details match your log-in.', 'error');
+        if (rec.logoutTime) return setMessage('Already logged out.', 'error');
+
+        const payload = { date: currentDate, action: 'Log Out', shift: n.shift, lastName: n.last, firstName: n.first, mi: n.mi, grade: n.grade, section: n.section, time: new Date().toISOString() };
+        setMessage('Saving...', 'info'); 
+        sendToSheet(payload);
+        
+        rec.logoutTime = payload.time; 
+        clearInputs(); 
+        render(); 
+        setMessage(`🚪 ${rec.fullName} logged out!`, 'success');
+      }
+
+      function clearInputs() { shiftInput.value = ''; lastNameInput.value = ''; firstNameInput.value = ''; middleInitialInput.value = ''; gradeLevelInput.value = ''; sectionInput.value = ''; lastNameInput.focus(); }
+
+      function openAdminModal() { downloadDateInput.value = currentDate; adminPasswordInput.value = ''; modalMsg.textContent = ''; adminModal.classList.add('show'); }
+      
+      async function confirmDownload() {
+        if (adminPasswordInput.value !== ADMIN_PASSWORD) return modalMsg.textContent = '❌ Incorrect password.';
+        const selDate = downloadDateInput.value;
+        try {
+          const res = await fetch(SCRIPT_URL + '?t=' + new Date().getTime()); 
+          const allData = await res.json();
+          const list = allData.filter(r => r.date === selDate);
+          if (list.length === 0) return modalMsg.textContent = '❌ No records found for this date.';
+          adminModal.classList.remove('show'); downloadExcel(selDate, list);
+        } catch (e) { modalMsg.textContent = `❌ Error connecting to Google.`; }
+      }
+
+      function downloadExcel(dateStr, rawRows) {
+        const grouped = {};
+        rawRows.forEach(row => {
+          const key = `${row.shift}|${row.lastName}|${row.firstName}|${row.mi}|${row.grade}|${row.section}`.toLowerCase();
+          if (!grouped[key]) grouped[key] = { ...row, fullName: `${row.lastName}, ${row.firstName} ${row.mi ? row.mi.charAt(0)+'.' : ''}`, loginTime: null, logoutTime: null };
+          if (row.action === 'Log In') grouped[key].loginTime = row.timestamp;
+          if (row.action === 'Log Out') grouped[key].logoutTime = row.timestamp;
+        });
+        const list = Object.values(grouped).sort((a, b) => new Date(a.loginTime || 0) - new Date(b.loginTime || 0));
+        
+        const rowsHtml = list.map((r, i) => `
+          <tr><td>${i + 1}</td><td>${escapeHtml(r.lastName)}</td><td>${escapeHtml(r.firstName)}</td><td>${escapeHtml(r.mi || '')}</td>
+          <td>${escapeHtml(r.grade)}</td><td>${escapeHtml(r.section)}</td><td>${escapeHtml(r.shift)}</td><td>${escapeHtml(r.fullName)}</td>
+          <td>${formatTime(r.loginTime)}</td><td>${formatTime(r.logoutTime)}</td><td>${r.logoutTime ? 'Logged Out' : 'Present'}</td></tr>`).join('');
+
+        const html = `<html><head><meta charset="UTF-8"></head><body><table border="1"><thead>
+          <tr><th colspan="11" style="font-size:16px;font-weight:bold;text-align:center;">Marigondon National High School</th></tr>
+          <tr><th colspan="11" style="font-size:13px;text-align:center;color:#8b0000;">DAILY ATTENDANCE TRACKER — ${prettyDateFromString(dateStr)}</th></tr>
+          <tr style="background:#1e5a8a;color:#ffffff;font-weight:bold;"><th>#</th><th>Last Name</th><th>First Name</th><th>M.I.</th><th>Grade</th><th>Section</th><th>Shift</th><th>Full Name</th><th>Log-in</th><th>Log-out</th><th>Status</th></tr>
+          </thead><tbody>${rowsHtml}</tbody></table></body></html>`;
+
+        const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = `MNHS_Attendance_${dateStr}.xls`; a.click();
+      }
+
+      function tick() {
+        const now = new Date();
+        $('liveDateText').textContent = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        $('currentTimeText').textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const t = todayStr(); if (t !== currentDate) { currentDate = t; fetchDataFromSheet(); }
+      }
+
+      function init() { currentDate = todayStr(); fetchDataFromSheet(); tick(); setInterval(tick, 1000); setInterval(fetchDataFromSheet, 30000); }
+      
+      loginBtn.addEventListener('click', handleLogin); logoutBtn.addEventListener('click', handleLogout);
+      clearBtn.addEventListener('click', clearInputs); $('downloadBtn').addEventListener('click', openAdminModal);
+      cancelModalBtn.addEventListener('click', () => adminModal.classList.remove('show'));
+      confirmDownloadBtn.addEventListener('click', confirmDownload); init();
+    })();
+  </script>
+</body>
+</html>
